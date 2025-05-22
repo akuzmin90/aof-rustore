@@ -1,18 +1,27 @@
 plugins {
     id 'com.android.application'
+    id("vkid.manifest.placeholders")
 }
 
 android {
-    compileSdk 32
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.example.helloandroid"
-        minSdk 21
-        targetSdk 32
-        versionCode 1
+        minSdk 24
+        targetSdk 33
+        versionCode 3
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        //TODO add client secret
+        manifestPlaceholders = [
+                VKIDRedirectHost   : "vk.com",
+                VKIDRedirectScheme : "vk5670079",
+                VKIDClientID       : "5670079",
+                VKIDClientSecret   : "your_client_secret"
+        ]
     }
 
     buildTypes {
@@ -37,4 +46,9 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
     // AppMetrica SDK.
     implementation("io.appmetrica.analytics:analytics:7.6.0")
+    implementation "ru.rustore.sdk:billingclient:6.1.0"
+
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.5.0'
+    implementation "com.vk.id:vkid:2.0.0"
 }
