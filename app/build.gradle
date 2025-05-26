@@ -1,10 +1,9 @@
 plugins {
     id 'com.android.application'
-    id("vkid.manifest.placeholders")
 }
 
 android {
-    compileSdk 34
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.example.helloandroid"
@@ -14,14 +13,6 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
-        //TODO add client secret
-        manifestPlaceholders = [
-                VKIDRedirectHost   : "vk.com",
-                VKIDRedirectScheme : "vk5670079",
-                VKIDClientID       : "5670079",
-                VKIDClientSecret   : "your_client_secret"
-        ]
     }
 
     buildTypes {
@@ -50,5 +41,4 @@ dependencies {
 
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.5.0'
-    implementation "com.vk.id:vkid:2.0.0"
 }

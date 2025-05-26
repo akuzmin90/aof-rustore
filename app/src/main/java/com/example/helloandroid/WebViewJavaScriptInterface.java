@@ -5,28 +5,13 @@ import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.Lifecycle;
-import androidx.lifecycle.LifecycleOwner;
-import androidx.lifecycle.LifecycleRegistry;
-
-import com.example.helloandroid.api.DataModel;
 import com.example.helloandroid.api.RetrofitAPI;
-import com.vk.id.AccessToken;
-import com.vk.id.OAuth;
-import com.vk.id.VKID;
-import com.vk.id.VKIDAuthFail;
-import com.vk.id.auth.AuthCodeData;
-import com.vk.id.auth.Prompt;
-import com.vk.id.auth.VKIDAuthCallback;
-import com.vk.id.auth.VKIDAuthParams;
+import com.example.helloandroid.security.HmacUtil;
+import com.example.helloandroid.storage.StorageUtil;
 
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -34,7 +19,6 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-import ru.rustore.sdk.*;
 import ru.rustore.sdk.billingclient.RuStoreBillingClient;
 import ru.rustore.sdk.billingclient.RuStoreBillingClientFactory;
 import ru.rustore.sdk.billingclient.model.purchase.PaymentResult;
@@ -49,13 +33,11 @@ public class WebViewJavaScriptInterface{
     private static final String TAG = "RuStoreBillingClient";
     private final Activity activity;
     RuStoreBillingClient billingClient;
-    VKID VKIDInstance;
-    LifecycleOwner lifecycleOwner;
 
     /*
      * Need a reference to the context in order to sent a post message
      */
-    public WebViewJavaScriptInterface(Activity activity, LifecycleOwner lifecycleOwner) {
+    public WebViewJavaScriptInterface(Activity activity) {
         final String consoleApplicationId = "5670079";
         final String deeplinkScheme = "zazer.mobi";
 
@@ -69,9 +51,11 @@ public class WebViewJavaScriptInterface{
                 deeplinkScheme
                 );
 
-        VKID.Companion.init(activity.getApplicationContext());
-        VKIDInstance = VKID.Companion.getInstance();
-        this.lifecycleOwner = lifecycleOwner;
+        List<Map<String, String>> failRequests = StorageUtil.getSavedQueries(activity.getApplicationContext());
+        for (Map<String, String> failRequest : failRequests) {
+            postRequest(Constants.GAME_URL, failRequest.get("productId"), failRequest.get("playerId"),
+                    failRequest.get("invoiceId"));
+        }
     }
 
     /*
@@ -82,55 +66,28 @@ public class WebViewJavaScriptInterface{
     public void makeToast(String message, boolean lengthLong){
         android.util.Log.d("WebView", message);
     }
-
     @JavascriptInterface
-    public void initiateAuth() {
-        //Toast.makeText(activity.getApplicationContext(),
-        //        "AUTH", Toast.LENGTH_SHORT).show();
-        String token;
-        String userId;
-        VKIDAuthCallback vkAuthCallback = new VKIDAuthCallback() {
-            @Override
-            public void onAuthCode(@NonNull AuthCodeData authCodeData, boolean b) {
-                Log.i("TAG", "onAuthCode");
-            }
-            @Override
-            public void onAuth(AccessToken accessToken) {
-                String token = accessToken.getToken();
-                Log.i("TAG", "token: " + token);
-            }
-
-            @Override
-            public void onFail(VKIDAuthFail fail) {
-                if (fail instanceof VKIDAuthFail.Canceled) {
-                    Log.i("TAG", "onFail if");
-                } else {
-                    Log.i("TAG", "onFail else");
-                }
-            }
-        };
-
-        VKIDAuthParams vkidAuthParams = new VKIDAuthParams.Builder().build();
-
-        VKIDInstance.authorize(lifecycleOwner, vkAuthCallback, vkidAuthParams);
-
-    }
-    @JavascriptInterface
-    public void initiatePayment(String productId) {
+    public void initiatePayment(String productId, String playerId) {
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
         purchasesUseCase.purchaseProduct(productId)
                 .addOnSuccessListener(result ->{
                     if (result instanceof PaymentResult.Success) {
-                        confirmPurchase((PaymentResult.Success) result);
+                        confirmPurchase((PaymentResult.Success) result, playerId);
                     }
                 })
                 .addOnFailureListener(throwable -> {
+                    Log.i("ERROR", throwable.getLocalizedMessage());
                     Toast.makeText(activity.getApplicationContext(),
                             "Покупка отменена или не удалась", Toast.LENGTH_SHORT).show();
                 });
     }
 
-    private void confirmPurchase(PaymentResult.Success purchase) {
+    @JavascriptInterface
+    public boolean isWebView() {
+        return true;
+    }
+
+    private void confirmPurchase(PaymentResult.Success purchase, String playerId) {
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
         purchasesUseCase.confirmPurchase(purchase.getPurchaseId())
                 .addOnSuccessListener(confirm -> {
@@ -139,21 +96,26 @@ public class WebViewJavaScriptInterface{
                             .addOnSuccessListener(result -> {
                                 if (result.getPurchaseState().equals(PurchaseState.PAID)
                                 || result.getPurchaseState().equals(PurchaseState.CONSUMED)) {
-                                    postRequest(Constants.GAME_URL, purchase.getProductId());
+                                    postRequest(Constants.GAME_URL, purchase.getProductId(), playerId, purchase.getInvoiceId());
                                 }
                             })
                             .addOnFailureListener(throwable -> {
+                                Log.i("ERROR", throwable.getLocalizedMessage());
                                 Toast.makeText(activity.getApplicationContext(),
                                         "Ошибка при получении информации о покупке", Toast.LENGTH_SHORT).show();
                             });
                 })
                 .addOnFailureListener(throwable -> {
+                    Log.i("ERROR", throwable.getLocalizedMessage());
                     Toast.makeText(activity.getApplicationContext(),
                             "Ошибка при подтверждении покупки: " + throwable.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
-    private void postRequest(String url, String product_id) {
+    private void postRequest(String url, String productId, String playerId, String invoiceId) {
+        long timestamp = System.currentTimeMillis() / 1000;
+        String signature = HmacUtil.generateSignature(timestamp, productId + playerId + invoiceId);
+
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(url)
                 .addConverterFactory(GsonConverterFactory.create())
@@ -161,16 +123,34 @@ public class WebViewJavaScriptInterface{
 
         RetrofitAPI retrofitAPI = retrofit.create(RetrofitAPI.class);
 
-        Call call = retrofitAPI.createPost(product_id,"1308266");
+        Call call = retrofitAPI.createPost(timestamp, signature, productId, playerId, invoiceId);
 
-        call.enqueue(new Callback<DataModel>() {
+        call.enqueue(new Callback<Void>() {
             @Override
-            public void onResponse(Call<DataModel> call, Response<DataModel> response) {
-                DataModel responseFromAPI = response.body();
-                }
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                Map<String, String> params = new HashMap<>();
+
+                params.put("productId", productId);
+                params.put("playerId", playerId);
+                params.put("invoiceId", invoiceId);
+
+                StorageUtil.removeQuery(activity.getApplicationContext(), params);
+                Log.i("BILLING", "Success buy");
+            }
 
             @Override
-            public void onFailure(Call<DataModel> call, Throwable t) {
+            public void onFailure(Call<Void> call, Throwable throwable) {
+                Map<String, String> params = new HashMap<>();
+
+                params.put("productId", productId);
+                params.put("playerId", playerId);
+                params.put("invoiceId", invoiceId);
+
+                StorageUtil.saveRequest(activity.getApplicationContext(), params);
+
+                Log.i("ERROR", throwable.getLocalizedMessage());
+                Toast.makeText(activity.getApplicationContext(),
+                        "Ошибка при подтверждении покупки: " + throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
 
             }
         });

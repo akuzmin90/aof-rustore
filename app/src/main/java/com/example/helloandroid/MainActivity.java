@@ -43,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl(Constants.GAME_URL);
 
         webView.getSettings().setJavaScriptEnabled(true);
-        webView.addJavascriptInterface(new WebViewJavaScriptInterface(this, this), "app");
+        webView.addJavascriptInterface(new WebViewJavaScriptInterface(this), "app");
     }
 
     @Override
