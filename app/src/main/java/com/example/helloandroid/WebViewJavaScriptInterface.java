@@ -138,8 +138,7 @@ public class WebViewJavaScriptInterface{
     }
 
     private void postRequest(String url, String productId, String playerId, String invoiceId) {
-        long timestamp = System.currentTimeMillis() / 1000;
-        String signature = HmacUtil.generateSignature(timestamp, productId + playerId + invoiceId);
+        String signature = HmacUtil.generateSignature(productId + playerId + invoiceId);
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(url)
@@ -148,7 +147,7 @@ public class WebViewJavaScriptInterface{
 
         RetrofitAPI retrofitAPI = retrofit.create(RetrofitAPI.class);
 
-        Call call = retrofitAPI.createPost(timestamp, signature, productId, playerId, invoiceId);
+        Call call = retrofitAPI.createPost(signature, productId, playerId, invoiceId);
 
         call.enqueue(new Callback<Void>() {
             @Override
