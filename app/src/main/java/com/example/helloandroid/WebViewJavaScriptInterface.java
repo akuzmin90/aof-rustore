@@ -24,6 +24,9 @@ import ru.rustore.sdk.billingclient.RuStoreBillingClientFactory;
 import ru.rustore.sdk.billingclient.model.purchase.PaymentResult;
 import ru.rustore.sdk.billingclient.model.purchase.PurchaseState;
 import ru.rustore.sdk.billingclient.usecase.PurchasesUseCase;
+import ru.rustore.sdk.review.RuStoreReviewManager;
+import ru.rustore.sdk.review.RuStoreReviewManagerFactory;
+import ru.rustore.sdk.review.model.ReviewInfo;
 
 /*
  * JavaScript Interface. Web code can access methods in here
@@ -33,6 +36,9 @@ public class WebViewJavaScriptInterface{
     private static final String TAG = "RuStoreBillingClient";
     private final Activity activity;
     RuStoreBillingClient billingClient;
+
+    private RuStoreReviewManager reviewManager;
+    private ReviewInfo reviewInfo = null;
 
     /*
      * Need a reference to the context in order to sent a post message
@@ -56,6 +62,8 @@ public class WebViewJavaScriptInterface{
             postRequest(Constants.GAME_URL, failRequest.get("productId"), failRequest.get("playerId"),
                     failRequest.get("invoiceId"));
         }
+
+        reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
     }
 
     /*
@@ -85,6 +93,23 @@ public class WebViewJavaScriptInterface{
     @JavascriptInterface
     public boolean isWebView() {
         return true;
+    }
+
+    @JavascriptInterface
+    public void initRateApp() {
+        if (reviewInfo != null) return;
+
+        reviewManager.requestReviewFlow()
+                .addOnSuccessListener(reviewInfo -> {
+                    Log.i("requestReviewFlow", reviewInfo.toString());
+                    this.reviewInfo = reviewInfo;
+                    reviewManager.launchReviewFlow(reviewInfo)
+                            .addOnSuccessListener(unit -> Log.w("ReviewFlow", "Review Flow started UNIT: " + unit.toString()))
+                            .addOnFailureListener(throwable -> Log.e("launchReviewFlow", "Review Flow error" + throwable));
+                })
+                .addOnFailureListener(throwable -> {
+                    Log.w("requestReviewFlow", throwable.toString());
+                });
     }
 
     private void confirmPurchase(PaymentResult.Success purchase, String playerId) {
