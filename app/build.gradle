@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    compileSdk 32
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.example.helloandroid"
-        minSdk 21
-        targetSdk 32
-        versionCode 1
+        minSdk 24
+        targetSdk 33
+        versionCode 3
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -37,4 +37,9 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
     // AppMetrica SDK.
     implementation("io.appmetrica.analytics:analytics:7.6.0")
+    implementation "ru.rustore.sdk:billingclient:6.1.0"
+
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.5.0'
+    implementation "ru.rustore.sdk:review:6.1.0"
 }

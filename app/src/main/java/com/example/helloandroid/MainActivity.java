@@ -1,6 +1,8 @@
 package com.example.helloandroid;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.LifecycleOwner;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
@@ -34,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(webViewClient);
 
         // Initializing the AppMetrica SDK.
+        //TODO uncomment for release
         AppMetricaConfig config = AppMetricaConfig.newConfigBuilder(API_KEY).build();
         AppMetrica.activate(this, config);
 
