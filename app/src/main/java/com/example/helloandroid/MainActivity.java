@@ -37,8 +37,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Initializing the AppMetrica SDK.
         //TODO uncomment for release
-//        AppMetricaConfig config = AppMetricaConfig.newConfigBuilder(API_KEY).build();
-//        AppMetrica.activate(this, config);
+        AppMetricaConfig config = AppMetricaConfig.newConfigBuilder(API_KEY).build();
+        AppMetrica.activate(this, config);
 
         webView.loadUrl(Constants.GAME_URL);
 
