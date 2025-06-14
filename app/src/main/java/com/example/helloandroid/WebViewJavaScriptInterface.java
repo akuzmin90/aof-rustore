@@ -59,8 +59,9 @@ public class WebViewJavaScriptInterface{
 
         List<Map<String, String>> failRequests = StorageUtil.getSavedQueries(activity.getApplicationContext());
         for (Map<String, String> failRequest : failRequests) {
+            billingClient.getPurchases().confirmPurchase(failRequest.get("purchaseId"));
             postRequest(Constants.GAME_URL, failRequest.get("productId"), failRequest.get("playerId"),
-                    failRequest.get("invoiceId"));
+            failRequest.get("invoiceId"), failRequest.get("purchaseId"));
         }
 
         reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
@@ -113,6 +114,13 @@ public class WebViewJavaScriptInterface{
     }
 
     private void confirmPurchase(PaymentResult.Success purchase, String playerId) {
+        Map<String, String> params = new HashMap<>();
+        params.put("productId", purchase.getProductId());
+        params.put("playerId", playerId);
+        params.put("invoiceId", purchase.getInvoiceId());
+        params.put("purchaseId", purchase.getPurchaseId());
+        StorageUtil.saveRequest(activity.getApplicationContext(), params);
+
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
         purchasesUseCase.confirmPurchase(purchase.getPurchaseId())
                 .addOnSuccessListener(confirm -> {
@@ -121,7 +129,7 @@ public class WebViewJavaScriptInterface{
                             .addOnSuccessListener(result -> {
                                 if (result.getPurchaseState().equals(PurchaseState.PAID)
                                 || result.getPurchaseState().equals(PurchaseState.CONSUMED)) {
-                                    postRequest(Constants.GAME_URL, purchase.getProductId(), playerId, purchase.getInvoiceId());
+                                    postRequest(Constants.GAME_URL, purchase.getProductId(), playerId, purchase.getInvoiceId(), purchase.getPurchaseId());
                                 }
                             })
                             .addOnFailureListener(throwable -> {
@@ -137,7 +145,8 @@ public class WebViewJavaScriptInterface{
                 });
     }
 
-    private void postRequest(String url, String productId, String playerId, String invoiceId) {
+    private void postRequest(String url, String productId, String playerId, String invoiceId,
+                             String purchaseId) {
         String signature = HmacUtil.generateSignature(productId + playerId + invoiceId);
 
         Retrofit retrofit = new Retrofit.Builder()
@@ -157,6 +166,7 @@ public class WebViewJavaScriptInterface{
                 params.put("productId", productId);
                 params.put("playerId", playerId);
                 params.put("invoiceId", invoiceId);
+                params.put("purchaseId", purchaseId);
 
                 StorageUtil.removeQuery(activity.getApplicationContext(), params);
                 Log.i("BILLING", "Success buy");
@@ -164,14 +174,6 @@ public class WebViewJavaScriptInterface{
 
             @Override
             public void onFailure(Call<Void> call, Throwable throwable) {
-                Map<String, String> params = new HashMap<>();
-
-                params.put("productId", productId);
-                params.put("playerId", playerId);
-                params.put("invoiceId", invoiceId);
-
-                StorageUtil.saveRequest(activity.getApplicationContext(), params);
-
                 Log.i("ERROR", throwable.getLocalizedMessage());
                 Toast.makeText(activity.getApplicationContext(),
                         "Ошибка при подтверждении покупки: " + throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
