@@ -116,12 +116,14 @@ public class WebViewJavaScriptInterface{
     }
 
     private void confirmPurchase(PaymentResult.Success purchase, String playerId) {
-        Map<String, String> params = new HashMap<>();
-        params.put("productId", purchase.getProductId());
-        params.put("playerId", playerId);
-        params.put("invoiceId", purchase.getInvoiceId());
-        params.put("purchaseId", purchase.getPurchaseId());
-        StorageUtil.saveRequest(activity.getApplicationContext(), params);
+        try {
+            Map<String, String> params = new HashMap<>();
+            params.put("productId", purchase.getProductId());
+            params.put("playerId", playerId);
+            params.put("invoiceId", purchase.getInvoiceId());
+            params.put("purchaseId", purchase.getPurchaseId());
+            StorageUtil.saveRequest(activity.getApplicationContext(), params);
+        } catch (Exception ignore) {}
 
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
         purchasesUseCase.confirmPurchase(purchase.getPurchaseId())
