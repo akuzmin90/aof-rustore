@@ -1,6 +1,7 @@
 package com.example.helloandroid;
 
 import android.app.Activity;
+import android.content.Context;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
@@ -80,6 +81,7 @@ public class WebViewJavaScriptInterface{
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
         purchasesUseCase.purchaseProduct(productId)
                 .addOnSuccessListener(result ->{
+                    postRequestLog(Constants.GAME_URL, productId, playerId, "INIT_PAYMENT");
                     if (result instanceof PaymentResult.Success) {
                         confirmPurchase((PaymentResult.Success) result, playerId);
                     }
@@ -124,12 +126,15 @@ public class WebViewJavaScriptInterface{
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
         purchasesUseCase.confirmPurchase(purchase.getPurchaseId())
                 .addOnSuccessListener(confirm -> {
-                    PurchasesUseCase purchasesUseCase1 = billingClient.getPurchases();
-                    purchasesUseCase1.getPurchaseInfo(purchase.getPurchaseId())
+                    postRequestLog(Constants.GAME_URL, purchase.getProductId(), playerId, purchase.getInvoiceId());
+                    purchasesUseCase.getPurchaseInfo(purchase.getPurchaseId())
                             .addOnSuccessListener(result -> {
+                                postRequestLog(Constants.GAME_URL, purchase.getProductId(), playerId, result.getPurchaseState().name());
                                 if (result.getPurchaseState().equals(PurchaseState.PAID)
-                                || result.getPurchaseState().equals(PurchaseState.CONSUMED)) {
+                                || result.getPurchaseState().equals(PurchaseState.CONSUMED)
+                                || result.getPurchaseState().equals(PurchaseState.CONFIRMED)){
                                     postRequest(Constants.GAME_URL, purchase.getProductId(), playerId, purchase.getInvoiceId(), purchase.getPurchaseId());
+                                    postRequestLog(Constants.GAME_URL, purchase.getProductId(), playerId, "CONFIRMED BUY");
                                 }
                             })
                             .addOnFailureListener(throwable -> {
@@ -170,6 +175,32 @@ public class WebViewJavaScriptInterface{
 
                 StorageUtil.removeQuery(activity.getApplicationContext(), params);
                 Log.i("BILLING", "Success buy");
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable throwable) {
+                Log.i("ERROR", throwable.getLocalizedMessage());
+                Toast.makeText(activity.getApplicationContext(),
+                        "Ошибка при подтверждении покупки: " + throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
+
+            }
+        });
+    }
+
+    private void postRequestLog(String url, String productId, String playerId, String invoiceId) {
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(url)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        RetrofitAPI retrofitAPI = retrofit.create(RetrofitAPI.class);
+
+        Call call = retrofitAPI.createPostLogs(productId, playerId, invoiceId);
+
+        call.enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                Log.i("LOGGING", "Success added log");
             }
 
             @Override

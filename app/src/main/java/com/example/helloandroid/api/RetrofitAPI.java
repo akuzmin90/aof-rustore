@@ -13,4 +13,10 @@ public interface RetrofitAPI {
                                       @Query("product_id") String product_id,
                                       @Query("player_id") String playerId,
                                       @Query("invoice_id") String invoiceId);
+
+    @Headers("Accept: application/xml")
+    @POST("api/integration/rustore/log")
+    public Call<Void> createPostLogs(@Query("product_id") String product_id,
+                                 @Query("player_id") String playerId,
+                                 @Query("invoice_id") String invoiceId);
 }
