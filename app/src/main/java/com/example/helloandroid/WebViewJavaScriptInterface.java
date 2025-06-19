@@ -211,8 +211,6 @@ public class WebViewJavaScriptInterface{
     private void logThrowable(Throwable throwable, String errorText) {
         if (throwable.getLocalizedMessage() != null) {
             Log.i("ERROR", throwable.getLocalizedMessage());
-            Toast.makeText(activity.getApplicationContext(),
-                    errorText + throwable.getLocalizedMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
