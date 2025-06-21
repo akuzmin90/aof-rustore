@@ -29,6 +29,7 @@ import ru.rustore.sdk.billingclient.model.purchase.PaymentResult;
 import ru.rustore.sdk.billingclient.model.purchase.Purchase;
 import ru.rustore.sdk.billingclient.model.purchase.PurchaseState;
 import ru.rustore.sdk.billingclient.usecase.PurchasesUseCase;
+import ru.rustore.sdk.billingclient.usecase.UserInfoUseCase;
 import ru.rustore.sdk.review.RuStoreReviewManager;
 import ru.rustore.sdk.review.RuStoreReviewManagerFactory;
 import ru.rustore.sdk.review.model.ReviewInfo;
@@ -80,18 +81,23 @@ public class WebViewJavaScriptInterface{
 
     synchronized public void checkPayments() {
         try {
-            PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
-            purchasesUseCase.getPurchases()
-                    .addOnSuccessListener(purchases -> {
-                        for (Purchase purchase : purchases) {
-                            if (purchase != null && purchase.getPurchaseId() != null && State.PLAYER_ID != null) {
-                                confirmPurchase(purchasesUseCase, purchase.getPurchaseId());
-                            }
-                        }
-                    })
-                    .addOnFailureListener(throwable -> {
-                        logThrowable(throwable, "Покупка отменена или не удалась");
-                    });
+            UserInfoUseCase uiu = billingClient.getUserInfo();
+            uiu.getAuthorizationStatus().addOnSuccessListener(status -> {
+                if (status.getAuthorized()) {
+                    PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
+                    purchasesUseCase.getPurchases()
+                            .addOnSuccessListener(purchases -> {
+                                for (Purchase purchase : purchases) {
+                                    if (purchase != null && purchase.getPurchaseId() != null && State.PLAYER_ID != null) {
+                                        confirmPurchase(purchasesUseCase, purchase.getPurchaseId());
+                                    }
+                                }
+                            })
+                            .addOnFailureListener(throwable -> {
+                                logThrowable(throwable, "Покупка отменена или не удалась");
+                            });
+                }
+            });
 
             List<Map<String, String>> failRequests = StorageUtil.getSavedQueries(activity.getApplicationContext());
             for (Map<String, String> f : failRequests) {
