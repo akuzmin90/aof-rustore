@@ -8,6 +8,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -22,7 +23,8 @@ import io.appmetrica.analytics.AppMetricaConfig;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String API_KEY = "fsdfsodfni43of43";
+//    private static final String API_KEY = "fsdfsodfni43of43";
+    private static final String API_KEY = "58cceae9-e3aa-4099-b49b-3fab2c8a5b7f";
 
     private WebView webView = null;
     private LinearLayout noInternetLayout;
@@ -55,14 +57,24 @@ public class MainActivity extends AppCompatActivity {
         checkConnectionAndLoad();
 
         // Initializing the AppMetrica SDK.
-        //TODO uncomment for release
-//        AppMetricaConfig config = AppMetricaConfig.newConfigBuilder(API_KEY).build();
-//        AppMetrica.activate(this, config);
-
-        webView.loadUrl(Constants.GAME_URL);
+        AppMetricaConfig config = AppMetricaConfig.newConfigBuilder(API_KEY).build();
+        AppMetrica.activate(this, config);
+        AppMetrica.enableActivityAutoTracking(getApplication());
 
         webView.getSettings().setJavaScriptEnabled(true);
+        AppMetrica.initWebViewReporting(webView);
+        webView.loadUrl(Constants.GAME_URL);
+
         webView.addJavascriptInterface(new WebViewJavaScriptInterface(this), "app");
+
+        boolean isFirstRun = PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean("first_run", true);
+
+        if (isFirstRun) {
+            AppMetrica.reportEvent("первый_запуск");
+            PreferenceManager.getDefaultSharedPreferences(this)
+                    .edit().putBoolean("first_run", false).apply();
+        }
     }
 
     @Override

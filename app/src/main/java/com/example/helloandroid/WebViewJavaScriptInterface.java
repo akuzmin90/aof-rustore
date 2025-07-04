@@ -1,6 +1,7 @@
 package com.example.helloandroid;
 
 import android.app.Activity;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
@@ -11,12 +12,14 @@ import com.example.helloandroid.api.RetrofitAPI;
 import com.example.helloandroid.security.HmacUtil;
 import com.example.helloandroid.storage.StorageUtil;
 
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import io.appmetrica.analytics.Revenue;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -34,6 +37,7 @@ import ru.rustore.sdk.review.RuStoreReviewManager;
 import ru.rustore.sdk.review.RuStoreReviewManagerFactory;
 import ru.rustore.sdk.review.model.ReviewInfo;
 
+import io.appmetrica.analytics.AppMetrica;
 /*
  * JavaScript Interface. Web code can access methods in here
  * (as long as they have the @JavascriptInterface annotation)
@@ -156,7 +160,32 @@ public class WebViewJavaScriptInterface{
                         } catch (Exception ignore) {}
 
                         postRequest(Constants.GAME_URL, p.getProductId(), State.PLAYER_ID, p.getInvoiceId(), p.getPurchaseId());
-                        purchasesUseCase.confirmPurchase(p.getPurchaseId());
+                        purchasesUseCase.confirmPurchase(p.getPurchaseId()).addOnSuccessListener( success -> {
+
+                            boolean isFirstRun = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
+                                    .getBoolean("first_buy", true);
+
+                            String[] parts = p.getProductId().split("_");
+                            String price = parts[parts.length - 1];
+                            if (isFirstRun) {
+                                String firstBuyParameters = "{\"стоимость_товара\":" + price + "}";
+                                AppMetrica.reportEvent("первая_покупка", firstBuyParameters);
+                                PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
+                                        .edit().putBoolean("first_buy", false).apply();
+                            }
+
+                            Revenue revenue = Revenue.newBuilder(Math.round(Long.parseLong(price) * 1_000_000), Currency.getInstance("RUB"))
+                                    .withProductID(p.getProductId())
+                                    .withQuantity(1)
+                                    .withPayload("{\"OrderID\":\""+purchaseId+"\", \"source\":\"Rustore\"}")
+                                    .build();
+                            AppMetrica.reportRevenue(revenue);
+
+                            Map<String, Object> paramsEvent = new HashMap<>();
+                            paramsEvent.put("playerId", State.PLAYER_ID);
+                            paramsEvent.put("price", price);
+                            AppMetrica.reportEvent("покупка", paramsEvent);
+                        });
                     }
                 })
                 .addOnFailureListener(throwable -> {
