@@ -168,8 +168,8 @@ public class WebViewJavaScriptInterface{
                             String[] parts = p.getProductId().split("_");
                             String price = parts[parts.length - 1];
                             if (isFirstRun) {
-                                String firstBuyParameters = "{\"стоимость_товара\":" + price + "}";
-                                AppMetrica.reportEvent("первая_покупка", firstBuyParameters);
+                                String firstBuyParameters = "{\"price\":" + price + "}";
+                                AppMetrica.reportEvent("first_purchase", firstBuyParameters);
                                 PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
                                         .edit().putBoolean("first_buy", false).apply();
                             }
@@ -184,7 +184,7 @@ public class WebViewJavaScriptInterface{
                             Map<String, Object> paramsEvent = new HashMap<>();
                             paramsEvent.put("playerId", State.PLAYER_ID);
                             paramsEvent.put("price", price);
-                            AppMetrica.reportEvent("покупка", paramsEvent);
+                            AppMetrica.reportEvent("purchase", paramsEvent);
                         });
                     }
                 })

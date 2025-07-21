@@ -71,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
                 .getBoolean("first_run", true);
 
         if (isFirstRun) {
-            AppMetrica.reportEvent("первый_запуск");
+            AppMetrica.reportEvent("first_launch");
             PreferenceManager.getDefaultSharedPreferences(this)
                     .edit().putBoolean("first_run", false).apply();
         }
