@@ -105,7 +105,8 @@ public class WebViewJavaScriptInterface{
 
             List<Map<String, String>> failRequests = StorageUtil.getSavedQueries(activity.getApplicationContext());
             for (Map<String, String> f : failRequests) {
-                postRequest(Constants.GAME_URL, f.get("productId"), State.PLAYER_ID, f.get("invoiceId"), f.get("purchaseId"));
+                onSuccessConfirmPurchase(Constants.GAME_URL, f.get("productId"), State.PLAYER_ID, f.get("invoiceId"),
+                        f.get("purchaseId"), billingClient.getPurchases());
             }
         } catch (Exception ignore) {
 
@@ -159,38 +160,45 @@ public class WebViewJavaScriptInterface{
                             StorageUtil.saveRequest(activity.getApplicationContext(), params);
                         } catch (Exception ignore) {}
 
-                        postRequest(Constants.GAME_URL, p.getProductId(), State.PLAYER_ID, p.getInvoiceId(), p.getPurchaseId());
-                        purchasesUseCase.confirmPurchase(p.getPurchaseId()).addOnSuccessListener( success -> {
+                        onSuccessConfirmPurchase(Constants.GAME_URL, p.getProductId(), State.PLAYER_ID, p.getInvoiceId(),
+                                p.getPurchaseId(), purchasesUseCase);
 
-                            boolean isFirstRun = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
-                                    .getBoolean("first_buy", true);
-
-                            String[] parts = p.getProductId().split("_");
-                            String price = parts[parts.length - 1];
-                            if (isFirstRun) {
-                                String firstBuyParameters = "{\"стоимость_товара\":" + price + "}";
-                                AppMetrica.reportEvent("первая_покупка", firstBuyParameters);
-                                PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
-                                        .edit().putBoolean("first_buy", false).apply();
-                            }
-
-                            Revenue revenue = Revenue.newBuilder(Math.round(Long.parseLong(price) * 1_000_000), Currency.getInstance("RUB"))
-                                    .withProductID(p.getProductId())
-                                    .withQuantity(1)
-                                    .withPayload("{\"OrderID\":\""+purchaseId+"\", \"source\":\"Rustore\"}")
-                                    .build();
-                            AppMetrica.reportRevenue(revenue);
-
-                            Map<String, Object> paramsEvent = new HashMap<>();
-                            paramsEvent.put("playerId", State.PLAYER_ID);
-                            paramsEvent.put("price", price);
-                            AppMetrica.reportEvent("покупка", paramsEvent);
-                        });
                     }
                 })
                 .addOnFailureListener(throwable -> {
                     logThrowable(throwable, "Ошибка при получении информации о покупке");
                 });
+    }
+
+    private void onSuccessConfirmPurchase(String url, String productId, String playerId, String invoiceId,
+                     String purchaseId, PurchasesUseCase purchasesUseCase) {
+        postRequest(url, productId, playerId, invoiceId, purchaseId);
+        purchasesUseCase.confirmPurchase(purchaseId).addOnSuccessListener( success -> {
+
+            boolean isFirstBuy = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
+                    .getBoolean("first_buy", true);
+
+            String[] parts = productId.split("_");
+            String price = parts[parts.length - 1];
+            if (isFirstBuy) {
+                String firstBuyParameters = "{\"price\":" + price + "}";
+                AppMetrica.reportEvent("first_purchase", firstBuyParameters);
+                PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
+                        .edit().putBoolean("first_buy", false).apply();
+            }
+
+            Revenue revenue = Revenue.newBuilder(Math.round(Long.parseLong(price) * 1_000_000), Currency.getInstance("RUB"))
+                    .withProductID(productId)
+                    .withQuantity(1)
+                    .withPayload("{\"OrderID\":\""+purchaseId+"\", \"source\":\"Rustore\"}")
+                    .build();
+            AppMetrica.reportRevenue(revenue);
+
+            Map<String, Object> paramsEvent = new HashMap<>();
+            paramsEvent.put("playerId", playerId);
+            paramsEvent.put("price", price);
+            AppMetrica.reportEvent("purchase", paramsEvent);
+        });
     }
 
     private void postRequest(String url, String productId, String playerId, String invoiceId,
