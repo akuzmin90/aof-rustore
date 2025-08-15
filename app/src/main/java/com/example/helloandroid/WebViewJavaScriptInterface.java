@@ -1,6 +1,8 @@
 package com.example.helloandroid;
 
 import android.app.Activity;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
@@ -117,7 +119,8 @@ public class WebViewJavaScriptInterface{
     public void initiatePayment(String productId, String playerId) {
         State.PLAYER_ID = playerId;
         PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
-        purchasesUseCase.purchaseProduct(productId)
+        String developerPayload = "PlayerId="+playerId+";ProductId="+productId;
+        purchasesUseCase.purchaseProduct(productId, null, 1, developerPayload)
                 .addOnSuccessListener(result ->{
                     if (result instanceof PaymentResult.Success) {
                         confirmPurchase(purchasesUseCase, ((PaymentResult.Success) result).getPurchaseId());
@@ -148,6 +151,18 @@ public class WebViewJavaScriptInterface{
                 .addOnFailureListener(throwable -> {
                     Log.w("requestReviewFlow", throwable.toString());
                 });
+    }
+
+    @JavascriptInterface
+    public int getAppVersion() {
+        try {
+            PackageInfo pInfo = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
+            int versionCode = pInfo.versionCode;
+            return versionCode;
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     private void confirmPurchase(PurchasesUseCase purchasesUseCase, String purchaseId) {
