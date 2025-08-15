@@ -162,7 +162,7 @@ public class WebViewJavaScriptInterface{
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
-        return 0;
+        return 27;
     }
 
     private void confirmPurchase(PurchasesUseCase purchasesUseCase, String purchaseId) {
