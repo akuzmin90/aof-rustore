@@ -18,6 +18,7 @@ import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -28,13 +29,18 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-import ru.rustore.sdk.billingclient.RuStoreBillingClient;
-import ru.rustore.sdk.billingclient.RuStoreBillingClientFactory;
-import ru.rustore.sdk.billingclient.model.purchase.PaymentResult;
-import ru.rustore.sdk.billingclient.model.purchase.Purchase;
-import ru.rustore.sdk.billingclient.model.purchase.PurchaseState;
-import ru.rustore.sdk.billingclient.usecase.PurchasesUseCase;
-import ru.rustore.sdk.billingclient.usecase.UserInfoUseCase;
+import ru.rustore.sdk.pay.PurchaseInteractor;
+import ru.rustore.sdk.pay.RuStorePayClient;
+import ru.rustore.sdk.pay.UserInteractor;
+import ru.rustore.sdk.pay.model.DeveloperPayload;
+import ru.rustore.sdk.pay.model.PreferredPurchaseType;
+import ru.rustore.sdk.pay.model.ProductId;
+import ru.rustore.sdk.pay.model.ProductPurchaseParams;
+import ru.rustore.sdk.pay.model.ProductPurchaseStatus;
+import ru.rustore.sdk.pay.model.ProductType;
+import ru.rustore.sdk.pay.model.Purchase;
+import ru.rustore.sdk.pay.model.PurchaseId;
+import ru.rustore.sdk.pay.model.RuStorePaymentException;
 import ru.rustore.sdk.review.RuStoreReviewManager;
 import ru.rustore.sdk.review.RuStoreReviewManagerFactory;
 import ru.rustore.sdk.review.model.ReviewInfo;
@@ -46,7 +52,6 @@ import io.appmetrica.analytics.AppMetrica;
  */
 public class WebViewJavaScriptInterface{
     private final Activity activity;
-    RuStoreBillingClient billingClient;
 
     private final RuStoreReviewManager reviewManager;
     private ReviewInfo reviewInfo = null;
@@ -55,18 +60,7 @@ public class WebViewJavaScriptInterface{
      * Need a reference to the context in order to sent a post message
      */
     public WebViewJavaScriptInterface(Activity activity) {
-        final String consoleApplicationId = "5670079";
-        final String deeplinkScheme = "zazer.mobi";
-
-        final boolean debugLogs = false;
-
         this.activity = activity;
-
-        billingClient = RuStoreBillingClientFactory.INSTANCE.create(
-                activity.getApplicationContext(),
-                consoleApplicationId,
-                deeplinkScheme
-                );
 
         reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
     }
@@ -77,6 +71,7 @@ public class WebViewJavaScriptInterface{
 
         Timer timer = new Timer();
 
+        lastPurchaseRetry();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -87,28 +82,10 @@ public class WebViewJavaScriptInterface{
 
     synchronized public void checkPayments() {
         try {
-            UserInfoUseCase uiu = billingClient.getUserInfo();
-            uiu.getAuthorizationStatus().addOnSuccessListener(status -> {
-                if (status.getAuthorized()) {
-                    PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
-                    purchasesUseCase.getPurchases()
-                            .addOnSuccessListener(purchases -> {
-                                for (Purchase purchase : purchases) {
-                                    if (purchase != null && purchase.getPurchaseId() != null && State.PLAYER_ID != null) {
-                                        confirmPurchase(purchasesUseCase, purchase.getPurchaseId());
-                                    }
-                                }
-                            })
-                            .addOnFailureListener(throwable -> {
-                                logThrowable(throwable, "Покупка отменена или не удалась");
-                            });
-                }
-            });
-
             List<Map<String, String>> failRequests = StorageUtil.getSavedQueries(activity.getApplicationContext());
             for (Map<String, String> f : failRequests) {
-                onSuccessConfirmPurchase(Constants.GAME_URL, f.get("productId"), State.PLAYER_ID, f.get("invoiceId"),
-                        f.get("purchaseId"), billingClient.getPurchases());
+                postRequest(Constants.GAME_URL, f.get("productId"), State.PLAYER_ID, f.get("invoiceId"),
+                        f.get("purchaseId"));
             }
         } catch (Exception ignore) {
 
@@ -118,16 +95,34 @@ public class WebViewJavaScriptInterface{
     @JavascriptInterface
     public void initiatePayment(String productId, String playerId) {
         State.PLAYER_ID = playerId;
-        PurchasesUseCase purchasesUseCase = billingClient.getPurchases();
-        String developerPayload = "PlayerId="+playerId+";ProductId="+productId;
-        purchasesUseCase.purchaseProduct(productId, null, 1, developerPayload)
-                .addOnSuccessListener(result ->{
-                    if (result instanceof PaymentResult.Success) {
-                        confirmPurchase(purchasesUseCase, ((PaymentResult.Success) result).getPurchaseId());
-                    }
+
+        String developerPayloadStr = "PlayerId="+playerId+";ProductId="+productId;
+        DeveloperPayload developerPayload = new DeveloperPayload(developerPayloadStr);
+
+        ProductPurchaseParams params = new ProductPurchaseParams(new ProductId(productId), null, null, developerPayload, null, null);
+
+        RuStorePayClient ruStorePayClient = RuStorePayClient.Companion.getInstance();
+        PurchaseInteractor purchaseInteractor = ruStorePayClient.getPurchaseInteractor();
+
+        purchaseInteractor.purchase(params, PreferredPurchaseType.ONE_STEP)
+                .addOnSuccessListener(result -> {
+                    try {
+                        Map<String, String> params1 = convert(productId, playerId, result.getInvoiceId().getValue(), result.getPurchaseId().getValue());
+                        StorageUtil.saveRequest(activity.getApplicationContext(), params1);
+                    } catch (Exception ignore) {}
+
+                    postRequest(Constants.GAME_URL, productId, playerId, result.getInvoiceId().getValue(), result.getPurchaseId().getValue());
+                    appmetricaEvent(productId, result.getPurchaseId().getValue(), playerId);
+
                 })
                 .addOnFailureListener(throwable -> {
-                    logThrowable(throwable, "Покупка отменена или не удалась");
+                    if (throwable instanceof RuStorePaymentException.ProductPurchaseException) {
+                        Toast.makeText(activity, "Ошибка при покупке продукта", Toast.LENGTH_LONG).show();
+                    } else if (throwable instanceof RuStorePaymentException.ProductPurchaseCancelled) {
+                        Toast.makeText(activity, "Покупка отменена", Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(activity, "Ошибка при покупке продукта", Toast.LENGTH_LONG).show();
+                    }
                 });
     }
 
@@ -162,57 +157,23 @@ public class WebViewJavaScriptInterface{
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
-        return 27;
+        return 34;
     }
 
-    private void confirmPurchase(PurchasesUseCase purchasesUseCase, String purchaseId) {
-        purchasesUseCase.getPurchaseInfo(purchaseId)
-                .addOnSuccessListener(p -> {
-                    PurchaseState state = p.getPurchaseState();
-                    if (state != null && (state.equals(PurchaseState.PAID) || state.equals(PurchaseState.CONSUMED) || state.equals(PurchaseState.CONFIRMED))) {
-                        try {
-                            Map<String, String> params = convert(p.getProductId(), State.PLAYER_ID, p.getInvoiceId(), purchaseId);
-                            StorageUtil.saveRequest(activity.getApplicationContext(), params);
-                        } catch (Exception ignore) {}
+    private void confirmPurchase(String purchaseId, String productId, String playerId, String invoiceId) {
+        PurchaseInteractor purchaseInteractor = RuStorePayClient.Companion.getInstance().getPurchaseInteractor();
 
-                        onSuccessConfirmPurchase(Constants.GAME_URL, p.getProductId(), State.PLAYER_ID, p.getInvoiceId(),
-                                p.getPurchaseId(), purchasesUseCase);
+        purchaseInteractor.confirmTwoStepPurchase(
+                new PurchaseId(purchaseId),
+                null
+        ).addOnSuccessListener( success -> {
+            postRequest(Constants.GAME_URL, productId, playerId, invoiceId, purchaseId);
 
-                    }
-                })
-                .addOnFailureListener(throwable -> {
-                    logThrowable(throwable, "Ошибка при получении информации о покупке");
-                });
-    }
-
-    private void onSuccessConfirmPurchase(String url, String productId, String playerId, String invoiceId,
-                     String purchaseId, PurchasesUseCase purchasesUseCase) {
-        postRequest(url, productId, playerId, invoiceId, purchaseId);
-        purchasesUseCase.confirmPurchase(purchaseId).addOnSuccessListener( success -> {
-
-            boolean isFirstBuy = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
-                    .getBoolean("first_buy", true);
-
-            String[] parts = productId.split("_");
-            String price = parts[parts.length - 1];
-            if (isFirstBuy) {
-                String firstBuyParameters = "{\"price\":" + price + "}";
-                AppMetrica.reportEvent("first_purchase", firstBuyParameters);
-                PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
-                        .edit().putBoolean("first_buy", false).apply();
-            }
-
-            Revenue revenue = Revenue.newBuilder(Math.round(Long.parseLong(price) * 1_000_000), Currency.getInstance("RUB"))
-                    .withProductID(productId)
-                    .withQuantity(1)
-                    .withPayload("{\"OrderID\":\""+purchaseId+"\", \"source\":\"Rustore\"}")
-                    .build();
-            AppMetrica.reportRevenue(revenue);
-
-            Map<String, Object> paramsEvent = new HashMap<>();
-            paramsEvent.put("playerId", playerId);
-            paramsEvent.put("price", price);
-            AppMetrica.reportEvent("purchase", paramsEvent);
+            appmetricaEvent(productId, purchaseId, playerId);
+            // Логика успешного подтверждения покупки
+        }).addOnFailureListener(throwable -> {
+            Toast.makeText(activity, "Ошибка при подтверждении покупки, подождите несколько минут или обратитесь в поддержку", Toast.LENGTH_LONG).show();
+            // Обработка ошибки
         });
     }
 
@@ -272,6 +233,32 @@ public class WebViewJavaScriptInterface{
         }
     }
 
+    private void appmetricaEvent(String productId, String purchaseId, String playerId) {
+        boolean isFirstBuy = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
+                .getBoolean("first_buy", true);
+
+        String[] parts = productId.split("_");
+        String price = parts[parts.length - 1];
+        if (isFirstBuy) {
+            String firstBuyParameters = "{\"price\":" + price + "}";
+            AppMetrica.reportEvent("first_purchase", firstBuyParameters);
+            PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext())
+                    .edit().putBoolean("first_buy", false).apply();
+        }
+
+        Revenue revenue = Revenue.newBuilder(Math.round(Long.parseLong(price) * 1_000_000), Currency.getInstance("RUB"))
+                .withProductID(productId)
+                .withQuantity(1)
+                .withPayload("{\"OrderID\":\""+purchaseId+"\", \"source\":\"Rustore\"}")
+                .build();
+        AppMetrica.reportRevenue(revenue);
+
+        Map<String, Object> paramsEvent = new HashMap<>();
+        paramsEvent.put("playerId", playerId);
+        paramsEvent.put("price", price);
+        AppMetrica.reportEvent("purchase", paramsEvent);
+    }
+
     private static Map<String, String> convert(String productId, String playerId, String invoiceId, String purchaseId) {
         Map<String, String> params = new HashMap<>();
 
@@ -282,4 +269,45 @@ public class WebViewJavaScriptInterface{
         return params;
     }
 
+    public void lastPurchaseRetry() {
+        try {
+            PurchaseInteractor purchaseInteractor = RuStorePayClient.Companion.getInstance().getPurchaseInteractor();
+
+            purchaseInteractor.getPurchases(ProductType.CONSUMABLE_PRODUCT, ProductPurchaseStatus.CONFIRMED)
+                    .addOnSuccessListener(purchases -> {
+                        if (purchases != null) {
+                            Purchase lastPurchase = null;
+                            long maxInvoiceId = 0;
+                            for (Purchase purchase : purchases) {
+                                if (purchase != null) {
+                                    long invoiceId = Long.parseLong(purchase.getInvoiceId().getValue());
+                                    if (invoiceId > maxInvoiceId) {
+                                        maxInvoiceId = invoiceId;
+                                        lastPurchase = purchase;
+                                    }
+                                }
+                            }
+                            Map<String, String> map = new HashMap<>();
+                            if (lastPurchase != null) {
+                                for (String part : Objects.requireNonNull(lastPurchase.getDeveloperPayload()).getValue().split(";")) {
+                                    String[] kv = part.split("=");
+                                    if (kv.length == 2) {
+                                        map.put(kv[0], kv[1]);
+                                    }
+                                }
+
+                                String productId = map.get("ProductId");
+                                String playerId = map.get("PlayerId");
+
+                                Map<String, String> params = convert(productId, playerId,
+                                        lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
+                                StorageUtil.saveRequest(activity.getApplicationContext(), params);
+
+                                postRequest(Constants.GAME_URL, productId, playerId,
+                                        lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
+                            }
+                        }
+                    });
+        } catch (Exception ignored) {}
+    }
 }

@@ -4,11 +4,13 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -20,11 +22,15 @@ import android.widget.LinearLayout;
 
 import io.appmetrica.analytics.AppMetrica;
 import io.appmetrica.analytics.AppMetricaConfig;
+import ru.rustore.sdk.pay.IntentInteractor;
+import ru.rustore.sdk.pay.RuStorePayClient;
+import ru.rustore.sdk.pay.RuStorePayClientProvider;
 
 public class MainActivity extends AppCompatActivity {
 
 //    private static final String API_KEY = "fsdfsodfni43of43";
     private static final String API_KEY = "58cceae9-e3aa-4099-b49b-3fab2c8a5b7f";
+    private IntentInteractor intentInteractor;
 
     private WebView webView = null;
     private LinearLayout noInternetLayout;
@@ -34,6 +40,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        intentInteractor = RuStorePayClient.Companion.getInstance().getIntentInteractor();
+
+        if (savedInstanceState == null) {
+            intentInteractor.proceedIntent(getIntent());
+        }
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
 
@@ -86,7 +98,11 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onKeyDown(keyCode, event);
     }
-
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        intentInteractor.proceedIntent(intent);
+    }
     private void checkConnectionAndLoad() {
         if (isConnected()) {
             webView.setVisibility(View.VISIBLE);

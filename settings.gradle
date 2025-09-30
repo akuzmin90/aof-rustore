@@ -4,7 +4,10 @@ pluginManagement {
         google()
         mavenCentral()
         //maven{url = "https://artifactory-external.vkpartner.ru/artifactory/vkid-sdk-android/"}
-        maven { setUrl("https://artifactory-external.vkpartner.ru/artifactory/maven/") }
+        maven {
+            url = uri("https://artifactory-external.vkpartner.ru/artifactory/maven")
+        }
+//        maven { setUrl("https://artifactory-external.vkpartner.ru/artifactory/maven/") }
         //maven("https://artifactory-external.vkpartner.ru/artifactory/maven/")
     }
 }
