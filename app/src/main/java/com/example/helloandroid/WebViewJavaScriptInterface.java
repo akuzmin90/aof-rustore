@@ -18,6 +18,7 @@ import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -35,6 +36,9 @@ import ru.rustore.sdk.pay.model.DeveloperPayload;
 import ru.rustore.sdk.pay.model.PreferredPurchaseType;
 import ru.rustore.sdk.pay.model.ProductId;
 import ru.rustore.sdk.pay.model.ProductPurchaseParams;
+import ru.rustore.sdk.pay.model.ProductPurchaseStatus;
+import ru.rustore.sdk.pay.model.ProductType;
+import ru.rustore.sdk.pay.model.Purchase;
 import ru.rustore.sdk.pay.model.PurchaseId;
 import ru.rustore.sdk.pay.model.RuStorePaymentException;
 import ru.rustore.sdk.review.RuStoreReviewManager;
@@ -56,13 +60,7 @@ public class WebViewJavaScriptInterface{
      * Need a reference to the context in order to sent a post message
      */
     public WebViewJavaScriptInterface(Activity activity) {
-        final String consoleApplicationId = "5670079";
-        final String deeplinkScheme = "zazer.mobi";
-
-        final boolean debugLogs = false;
-
         this.activity = activity;
-
 
         reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
     }
@@ -73,6 +71,7 @@ public class WebViewJavaScriptInterface{
 
         Timer timer = new Timer();
 
+        lastPurchaseRetry();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -108,12 +107,12 @@ public class WebViewJavaScriptInterface{
         purchaseInteractor.purchase(params, PreferredPurchaseType.ONE_STEP)
                 .addOnSuccessListener(result -> {
                     try {
-                        Map<String, String> params1 = convert(result.getProductId().toString(), playerId, result.getInvoiceId().toString(), result.getPurchaseId().toString());
+                        Map<String, String> params1 = convert(productId, playerId, result.getInvoiceId().getValue(), result.getPurchaseId().getValue());
                         StorageUtil.saveRequest(activity.getApplicationContext(), params1);
                     } catch (Exception ignore) {}
 
-                    postRequest(Constants.GAME_URL, productId, playerId, result.getInvoiceId().toString(), result.getPurchaseId().toString());
-                    appmetricaEvent(productId, result.getPurchaseId().toString(), playerId);
+                    postRequest(Constants.GAME_URL, productId, playerId, result.getInvoiceId().getValue(), result.getPurchaseId().getValue());
+                    appmetricaEvent(productId, result.getPurchaseId().getValue(), playerId);
 
                 })
                 .addOnFailureListener(throwable -> {
@@ -158,7 +157,7 @@ public class WebViewJavaScriptInterface{
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
-        return 27;
+        return 34;
     }
 
     private void confirmPurchase(String purchaseId, String productId, String playerId, String invoiceId) {
@@ -270,4 +269,45 @@ public class WebViewJavaScriptInterface{
         return params;
     }
 
+    public void lastPurchaseRetry() {
+        try {
+            PurchaseInteractor purchaseInteractor = RuStorePayClient.Companion.getInstance().getPurchaseInteractor();
+
+            purchaseInteractor.getPurchases(ProductType.CONSUMABLE_PRODUCT, ProductPurchaseStatus.CONFIRMED)
+                    .addOnSuccessListener(purchases -> {
+                        if (purchases != null) {
+                            Purchase lastPurchase = null;
+                            long maxInvoiceId = 0;
+                            for (Purchase purchase : purchases) {
+                                if (purchase != null) {
+                                    long invoiceId = Long.parseLong(purchase.getInvoiceId().getValue());
+                                    if (invoiceId > maxInvoiceId) {
+                                        maxInvoiceId = invoiceId;
+                                        lastPurchase = purchase;
+                                    }
+                                }
+                            }
+                            Map<String, String> map = new HashMap<>();
+                            if (lastPurchase != null) {
+                                for (String part : Objects.requireNonNull(lastPurchase.getDeveloperPayload()).getValue().split(";")) {
+                                    String[] kv = part.split("=");
+                                    if (kv.length == 2) {
+                                        map.put(kv[0], kv[1]);
+                                    }
+                                }
+
+                                String productId = map.get("ProductId");
+                                String playerId = map.get("PlayerId");
+
+                                Map<String, String> params = convert(productId, playerId,
+                                        lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
+                                StorageUtil.saveRequest(activity.getApplicationContext(), params);
+
+                                postRequest(Constants.GAME_URL, productId, playerId,
+                                        lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
+                            }
+                        }
+                    });
+        } catch (Exception ignored) {}
+    }
 }
