@@ -13,7 +13,10 @@ import androidx.annotation.NonNull;
 import com.example.helloandroid.api.RetrofitAPI;
 import com.example.helloandroid.security.HmacUtil;
 import com.example.helloandroid.storage.StorageUtil;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +68,15 @@ public class WebViewJavaScriptInterface{
         reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
     }
 
+    @JavascriptInterface
+    public String getCreaturesOrder() {
+        return StorageUtil.getCreaturesOrder(activity.getApplicationContext());
+    }
+
+    @JavascriptInterface
+    public void saveCreaturesOrder(String data) {
+        StorageUtil.saveCreaturesOrder(activity.getApplicationContext(), data);
+    }
     @JavascriptInterface
     public void initPaymentApi(String playerId) {
         State.PLAYER_ID = playerId;
