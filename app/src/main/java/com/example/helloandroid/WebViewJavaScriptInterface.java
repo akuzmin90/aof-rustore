@@ -313,12 +313,16 @@ public class WebViewJavaScriptInterface{
                                     }
                                 }
                             } catch (Exception e) {
+                                postRequestLog(Constants.GAME_URL, "ERROR", State.PLAYER_ID, e.toString());
                                 Log.e("lastPurchaseRetry", e.toString());
                             }
                         }).addOnFailureListener(error -> {
+                            postRequestLog(Constants.GAME_URL, "ERROR", State.PLAYER_ID, error.toString());
                             Log.e("lastPurchaseRetry", error.toString());
                         });
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            postRequestLog(Constants.GAME_URL, "ERROR", State.PLAYER_ID, e.toString());
+        }
     }
 }
