@@ -2,17 +2,21 @@ package com.example.helloandroid.storage;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class StorageUtil {
     private static final String PREFS_NAME = "retry_prefs";
+    private static final String CREATURE_ORDER_PREFS = "creature_order";
+    private static final String CREATURE_ORDER = "creature_order_list";
     private static final String KEY_QUERY_LIST = "query_list";
 
     public static void saveRequest(Context context, Map<String, String> params) {
@@ -48,4 +52,15 @@ public class StorageUtil {
         String json = gson.toJson(currentList);
         prefs.edit().putString(KEY_QUERY_LIST, json).apply();
     }
+
+    public static void saveCreaturesOrder(Context context, String json) {
+        SharedPreferences prefs = context.getSharedPreferences(CREATURE_ORDER_PREFS, Context.MODE_PRIVATE);
+        prefs.edit().putString(CREATURE_ORDER, json).apply();
+    }
+
+    public static String getCreaturesOrder(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(CREATURE_ORDER_PREFS, Context.MODE_PRIVATE);
+        return prefs.getString(CREATURE_ORDER, null);
+    }
+
 }

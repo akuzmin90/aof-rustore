@@ -13,7 +13,10 @@ import androidx.annotation.NonNull;
 import com.example.helloandroid.api.RetrofitAPI;
 import com.example.helloandroid.security.HmacUtil;
 import com.example.helloandroid.storage.StorageUtil;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +68,15 @@ public class WebViewJavaScriptInterface{
         reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
     }
 
+    @JavascriptInterface
+    public String getCreaturesOrder() {
+        return StorageUtil.getCreaturesOrder(activity.getApplicationContext());
+    }
+
+    @JavascriptInterface
+    public void saveCreaturesOrder(String data) {
+        StorageUtil.saveCreaturesOrder(activity.getApplicationContext(), data);
+    }
     @JavascriptInterface
     public void initPaymentApi(String playerId) {
         State.PLAYER_ID = playerId;
@@ -273,41 +285,56 @@ public class WebViewJavaScriptInterface{
         try {
             PurchaseInteractor purchaseInteractor = RuStorePayClient.Companion.getInstance().getPurchaseInteractor();
 
-            purchaseInteractor.getPurchases(ProductType.CONSUMABLE_PRODUCT, ProductPurchaseStatus.CONFIRMED)
-                    .addOnSuccessListener(purchases -> {
-                        if (purchases != null) {
-                            Purchase lastPurchase = null;
-                            long maxInvoiceId = 0;
-                            for (Purchase purchase : purchases) {
-                                if (purchase != null) {
-                                    long invoiceId = Long.parseLong(purchase.getInvoiceId().getValue());
-                                    if (invoiceId > maxInvoiceId) {
-                                        maxInvoiceId = invoiceId;
-                                        lastPurchase = purchase;
+            if (purchaseInteractor != null) {
+                purchaseInteractor.getPurchases(ProductType.CONSUMABLE_PRODUCT, ProductPurchaseStatus.CONFIRMED)
+                        .addOnSuccessListener(purchases -> {
+                            try {
+                                if (purchases != null) {
+                                    Purchase lastPurchase = null;
+                                    long maxInvoiceId = 0;
+                                    for (Purchase purchase : purchases) {
+                                        if (purchase != null) {
+                                            long invoiceId = Long.parseLong(purchase.getInvoiceId().getValue());
+                                            if (invoiceId > maxInvoiceId) {
+                                                maxInvoiceId = invoiceId;
+                                                lastPurchase = purchase;
+                                            }
+                                        }
+                                    }
+                                    Map<String, String> map = new HashMap<>();
+                                    if (lastPurchase != null) {
+                                        for (String part : Objects.requireNonNull(lastPurchase.getDeveloperPayload()).getValue().split(";")) {
+                                            String[] kv = part.split("=");
+                                            if (kv.length == 2) {
+                                                map.put(kv[0], kv[1]);
+                                            }
+                                        }
+
+                                        if (!Objects.requireNonNull(map.get("ProductId")).isEmpty() &&
+                                                !Objects.requireNonNull(map.get("PlayerId")).isEmpty()) {
+                                            String productId = map.get("ProductId");
+                                            String playerId = map.get("PlayerId");
+
+                                            Map<String, String> params = convert(productId, playerId,
+                                                    lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
+                                            StorageUtil.saveRequest(activity.getApplicationContext(), params);
+
+                                            postRequest(Constants.GAME_URL, productId, playerId,
+                                                    lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
+                                        }
                                     }
                                 }
+                            } catch (Exception e) {
+                                postRequestLog(Constants.GAME_URL, "ERROR", State.PLAYER_ID, e.toString());
+                                Log.e("lastPurchaseRetry", e.toString());
                             }
-                            Map<String, String> map = new HashMap<>();
-                            if (lastPurchase != null) {
-                                for (String part : Objects.requireNonNull(lastPurchase.getDeveloperPayload()).getValue().split(";")) {
-                                    String[] kv = part.split("=");
-                                    if (kv.length == 2) {
-                                        map.put(kv[0], kv[1]);
-                                    }
-                                }
-
-                                String productId = map.get("ProductId");
-                                String playerId = map.get("PlayerId");
-
-                                Map<String, String> params = convert(productId, playerId,
-                                        lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
-                                StorageUtil.saveRequest(activity.getApplicationContext(), params);
-
-                                postRequest(Constants.GAME_URL, productId, playerId,
-                                        lastPurchase.getInvoiceId().getValue(), lastPurchase.getPurchaseId().getValue());
-                            }
-                        }
-                    });
-        } catch (Exception ignored) {}
+                        }).addOnFailureListener(error -> {
+                            postRequestLog(Constants.GAME_URL, "ERROR", State.PLAYER_ID, error.toString());
+                            Log.e("lastPurchaseRetry", error.toString());
+                        });
+            }
+        } catch (Exception e) {
+            postRequestLog(Constants.GAME_URL, "ERROR", State.PLAYER_ID, e.toString());
+        }
     }
 }
