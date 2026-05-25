@@ -14,14 +14,10 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
-import android.webkit.ConsoleMessage;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
@@ -29,11 +25,8 @@ import io.appmetrica.analytics.AppMetrica;
 import io.appmetrica.analytics.AppMetricaConfig;
 import ru.rustore.sdk.pay.IntentInteractor;
 import ru.rustore.sdk.pay.RuStorePayClient;
-import ru.rustore.sdk.pay.RuStorePayClientProvider;
 
 public class MainActivity extends AppCompatActivity {
-
-    //    private static final String API_KEY = "fsdfsodfni43of43";
     private static final String API_KEY = "58cceae9-e3aa-4099-b49b-3fab2c8a5b7f";
     private IntentInteractor intentInteractor;
 
@@ -52,7 +45,6 @@ public class MainActivity extends AppCompatActivity {
             intentInteractor.proceedIntent(getIntent());
         }
 
-        // Включаем edge-to-edge режим: контент рисуется под системными панелями
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         setContentView(R.layout.activity_main);
@@ -117,13 +109,11 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onKeyDown(keyCode, event);
     }
-
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         intentInteractor.proceedIntent(intent);
     }
-
     private void checkConnectionAndLoad() {
         if (isConnected()) {
             webView.setVisibility(View.VISIBLE);
