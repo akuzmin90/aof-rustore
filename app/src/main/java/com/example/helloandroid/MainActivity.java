@@ -1,6 +1,10 @@
 package com.example.helloandroid;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -10,15 +14,10 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.WindowManager;
-import android.webkit.ConsoleMessage;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
@@ -26,11 +25,8 @@ import io.appmetrica.analytics.AppMetrica;
 import io.appmetrica.analytics.AppMetricaConfig;
 import ru.rustore.sdk.pay.IntentInteractor;
 import ru.rustore.sdk.pay.RuStorePayClient;
-import ru.rustore.sdk.pay.RuStorePayClientProvider;
 
 public class MainActivity extends AppCompatActivity {
-
-//    private static final String API_KEY = "fsdfsodfni43of43";
     private static final String API_KEY = "58cceae9-e3aa-4099-b49b-3fab2c8a5b7f";
     private IntentInteractor intentInteractor;
 
@@ -48,12 +44,25 @@ public class MainActivity extends AppCompatActivity {
         if (savedInstanceState == null) {
             intentInteractor.proceedIntent(getIntent());
         }
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
         setContentView(R.layout.activity_main);
 
         this.webView = findViewById(R.id.webview);
         noInternetLayout = findViewById(R.id.no_internet_layout);
         retryButton = findViewById(R.id.btn_retry);
+
+        View rootView = findViewById(R.id.root_layout);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+            Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout()
+                            | WindowInsetsCompat.Type.ime()
+            );
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
