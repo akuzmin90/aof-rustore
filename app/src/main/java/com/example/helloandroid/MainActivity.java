@@ -16,10 +16,13 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.view.KeyEvent;
 import android.view.View;
+import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.LinearLayout;
+
+import com.example.helloandroid.auth.AuthController;
 
 import io.appmetrica.analytics.AppMetrica;
 import io.appmetrica.analytics.AppMetricaConfig;
@@ -31,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private IntentInteractor intentInteractor;
 
     private WebView webView = null;
+    private AuthController authController;
     private LinearLayout noInternetLayout;
     private Button retryButton;
 
@@ -41,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
 
         intentInteractor = RuStorePayClient.Companion.getInstance().getIntentInteractor();
 
-        if (savedInstanceState == null) {
+        if (savedInstanceState == null && !AuthController.isAuthRedirect(getIntent())) {
             intentInteractor.proceedIntent(getIntent());
         }
 
@@ -66,9 +70,21 @@ public class MainActivity extends AppCompatActivity {
 
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setDatabaseEnabled(true);
+
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
         WebViewClientImpl webViewClient = new WebViewClientImpl(this);
         webView.setWebViewClient(webViewClient);
+
+        authController = new AuthController(this, webView);
+        webView.addJavascriptInterface(new WebViewJavaScriptInterface(this, authController), "app");
+
+        if (savedInstanceState == null) {
+            authController.handleRedirect(getIntent());
+        }
 
         retryButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -84,11 +100,7 @@ public class MainActivity extends AppCompatActivity {
         AppMetrica.activate(this, config);
         AppMetrica.enableActivityAutoTracking(getApplication());
 
-        webView.getSettings().setJavaScriptEnabled(true);
         AppMetrica.initWebViewReporting(webView);
-        webView.loadUrl(Constants.GAME_URL);
-
-        webView.addJavascriptInterface(new WebViewJavaScriptInterface(this), "app");
 
         boolean isFirstRun = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean("first_run", true);
@@ -98,6 +110,21 @@ public class MainActivity extends AppCompatActivity {
             PreferenceManager.getDefaultSharedPreferences(this)
                     .edit().putBoolean("first_run", false).apply();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (authController != null) {
+            authController.onResume();
+        }
+    }
+
+    private void routeIntent(Intent intent) {
+        if (authController != null && authController.handleRedirect(intent)) {
+            return;
+        }
+        intentInteractor.proceedIntent(intent);
     }
 
     @Override
@@ -112,7 +139,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        intentInteractor.proceedIntent(intent);
+        setIntent(intent);
+        routeIntent(intent);
     }
     private void checkConnectionAndLoad() {
         if (isConnected()) {

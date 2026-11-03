@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 
 import com.example.helloandroid.api.RetrofitAPI;
+import com.example.helloandroid.auth.AuthController;
 import com.example.helloandroid.security.HmacUtil;
 import com.example.helloandroid.storage.StorageUtil;
 import com.google.gson.Gson;
@@ -55,6 +56,7 @@ import io.appmetrica.analytics.AppMetrica;
  */
 public class WebViewJavaScriptInterface{
     private final Activity activity;
+    private final AuthController authController;
 
     private final RuStoreReviewManager reviewManager;
     private ReviewInfo reviewInfo = null;
@@ -62,10 +64,21 @@ public class WebViewJavaScriptInterface{
     /*
      * Need a reference to the context in order to sent a post message
      */
-    public WebViewJavaScriptInterface(Activity activity) {
+    public WebViewJavaScriptInterface(Activity activity, AuthController authController) {
         this.activity = activity;
+        this.authController = authController;
 
         reviewManager = RuStoreReviewManagerFactory.INSTANCE.create(activity.getApplicationContext());
+    }
+
+    @JavascriptInterface
+    public void signInWithGoogleOAuth() {
+        authController.startGoogle();
+    }
+
+    @JavascriptInterface
+    public void signInWithApple() {
+        authController.startApple();
     }
 
     @JavascriptInterface
