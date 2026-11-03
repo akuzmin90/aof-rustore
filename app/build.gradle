@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+def googleAndroidClientId = "1050401152387-4bv3b39lm27dqjh0d2cn4ok119oi0uvr.apps.googleusercontent.com"
+def googleRedirectScheme = "com.googleusercontent.apps.1050401152387-4bv3b39lm27dqjh0d2cn4ok119oi0uvr"
+
+def appleServicesId = "mobi.mirland.aof"
+
 android {
     namespace "com.example.helloandroid"
     compileSdk 35
@@ -10,10 +15,22 @@ android {
         applicationId "com.example.helloandroid"
         minSdk 24
         targetSdk 35
-        versionCode 40
-        versionName "1.40"
+        versionCode 44
+        versionName "1.44"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField "String", "GOOGLE_ANDROID_CLIENT_ID", "\"${googleAndroidClientId}\""
+        buildConfigField "String", "GOOGLE_REDIRECT_SCHEME", "\"${googleRedirectScheme}\""
+        buildConfigField "String", "APPLE_SERVICES_ID", "\"${appleServicesId}\""
+        buildConfigField "String", "GAME_URL", '"https://apk.lglass.mobi"'
+        buildConfigField "String", "APPLE_REDIRECT_URI", '"https://apk.lglass.mobi/apple-android-callback.html"'
+
+        manifestPlaceholders = [googleRedirectScheme: googleRedirectScheme]
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     buildTypes {
@@ -33,6 +50,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.browser:browser:1.8.0'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
@@ -44,5 +62,6 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.5.0'
     implementation("com.squareup.retrofit2:converter-scalars:2.9.0")
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation "ru.rustore.sdk:review:9.0.1"
 }

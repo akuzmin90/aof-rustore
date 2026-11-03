@@ -3,6 +3,7 @@ package com.example.helloandroid;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.webkit.CookieManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -12,6 +13,12 @@ public class WebViewClientImpl extends WebViewClient {
 
     public WebViewClientImpl(Activity activity) {
         this.activity = activity;
+    }
+
+    @Override
+    public void onPageFinished(WebView view, String url) {
+        super.onPageFinished(view, url);
+        CookieManager.getInstance().flush();
     }
 
     @Override

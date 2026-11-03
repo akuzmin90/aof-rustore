@@ -35,6 +35,32 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".auth.AuthRedirectActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="${googleRedirectScheme}" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="com.example.helloandroid.auth" android:host="apple-callback" />
+            </intent-filter>
+        </activity>
+
         <meta-data
             android:name="sdk_pay_scheme_value"
             android:value="com.example.helloandroid" />
